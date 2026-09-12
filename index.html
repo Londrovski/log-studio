@@ -156,6 +156,25 @@
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
   }
+
+  // If a module fails to load, every button is still there and every one of them does
+  // nothing — which looks like a finished app that is simply broken. Say so instead.
+  setTimeout(async () => {
+    if (window.__logStudioReady) return;
+    let why = "One of the app's scripts did not load.";
+    try {
+      const r = await fetch("vendor/bundle.js", { method: "HEAD" });
+      if (!r.ok) why = `<code>vendor/bundle.js</code> is missing (HTTP ${r.status}). This site is serving the repository as-is rather than the built version: in GitHub, set <b>Settings → Pages → Source</b> to <b>GitHub Actions</b>, or run <code>npm run build</code> and serve <code>dist/</code>.`;
+    } catch {
+      why = "The app's scripts could not be fetched at all — check your connection.";
+    }
+    const box = document.getElementById("empty");
+    if (box) {
+      box.hidden = false;
+      box.innerHTML = `<h2>The app did not finish loading</h2><p>${why}</p>
+        <p class="hint">Nothing below will respond until this is fixed. The browser console has the details.</p>`;
+    }
+  }, 5000);
 </script>
 </body>
 </html>

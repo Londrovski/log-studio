@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TBRe Log Studio — GitLab streaming test</title>
+<style>
+ :root{--blue:#105bab;--ora:#E6642A;--yel:#ffc423;--ink:#18181b;--mut:#71717a;--line:#e4e4e7}
+ *{box-sizing:border-box} body{margin:0;font:16px/1.55 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:#fff}
+ header{padding:26px 28px;border-bottom:1px solid var(--line)}
+ h1{margin:0;font-size:24px} h1 b{color:var(--blue)} p.sub{margin:8px 0 0;color:var(--mut);font-size:14px;max-width:70ch}
+ main{padding:24px 28px;max-width:1100px}
+ .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:0 0 18px}
+ button{font:inherit;font-weight:600;border:0;border-radius:999px;padding:10px 20px;background:var(--blue);color:#fff;cursor:pointer}
+ button.ghost{background:#f4f4f5;color:var(--ink)} a.btn{display:inline-block;text-decoration:none}
+ input[type=password],input[type=text]{font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:10px;min-width:320px}
+ table{border-collapse:collapse;width:100%;font-size:14px;margin-top:6px} td,th{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+ .ok{color:#15803d;font-weight:700}.bad{color:#b91c1c;font-weight:700}.warn{color:#b45309;font-weight:700}
+ h2{font-size:17px;margin:26px 0 6px} .note{font-size:13px;color:var(--mut)}
+ #verdict{margin-top:22px;padding:16px 18px;border-radius:14px;background:#f4f4f5;font-size:15px;display:none}
+ code{background:#f4f4f5;padding:1px 6px;border-radius:5px;font-size:13px}
+</style></head><body>
+<header>
+  <h1><b>TBRe</b> Log Studio — GitLab streaming test</h1>
+  <p class="sub">This page is served from GitHub Pages. It tries every way a browser could read the app's templates out of the private GitLab repo <code>tbre-ai/software-tools/log-studio-assets</code>, and reports which ones a real browser allows. That decides how the launcher is built.</p>
+</header>
+<main>
+  <div class="row">
+    <button id="run">Run the tests</button>
+    <a class="btn" href="capability.html"><button class="ghost">Log reading &amp; MP4 test →</button></a>
+  </div>
+  <div class="row">
+    <input id="tok" type="password" placeholder="Optional: GitLab personal access token (read_api)">
+    <span class="note">Only used in your browser, stored locally. Leave blank to test the signed-in-session routes only.</span>
+  </div>
+
+  <h2>Routes tested</h2>
+  <table id="res"><thead><tr><th style="width:300px">Route</th><th style="width:90px">Result</th><th>Detail</th></tr></thead><tbody></tbody></table>
+  <div id="verdict"></div>
+  <h2>What each route means</h2>
+  <table>
+    <tr><td style="width:300px"><b>Raw file, signed-in session</b></td><td>The simplest: the launcher fetches the template file directly, relying on your GitLab login cookie.</td></tr>
+    <tr><td><b>API with your login</b></td><td>Same, through GitLab's API instead of the raw file path.</td></tr>
+    <tr><td><b>API with an access token</b></td><td>You paste a token once and the launcher remembers it. Works without cookies.</td></tr>
+    <tr><td><b>Script tag</b></td><td>Loading code from GitLab the way a page loads a script. Bypasses the usual cross-site rules, but GitLab may refuse to serve it as code.</td></tr>
+    <tr><td><b>Image tag</b></td><td>The control: this is how my earlier preview pulled photos out of GitLab, and it should pass.</td></tr>
+    <tr><td><b>GitHub raw</b></td><td>The other control: a public source, which should always work.</td></tr>
+  </table>
+</main>
+<script>
+const GL="https://gitlab.bath.ac.uk";
+const PROJ=encodeURIComponent("tbre-ai/software-tools/log-studio-assets");
+const PID="369";
+const RAW=`${GL}/${decodeURIComponent(PROJ)}/-/raw/main/cors-probe.txt`;
+const API=`${GL}/api/v4/projects/${PID}/repository/files/cors-probe.txt/raw?ref=main`;
+const GH="https://raw.githubusercontent.com/Londrovski/log-studio/main/README.md";
+const tb=document.querySelector("#res tbody");
+const tok=document.getElementById("tok");
+tok.value=localStorage.getItem("gl_token")||"";
+function row(name){const tr=document.createElement("tr");tr.innerHTML="<td></td><td>…</td><td></td>";tr.children[0].textContent=name;tb.appendChild(tr);
+  return (state,detail)=>{tr.children[1].innerHTML=state==="ok"?'<span class="ok">WORKS</span>':state==="bad"?'<span class="bad">BLOCKED</span>':'<span class="warn">PARTIAL</span>';tr.children[2].textContent=detail;return state;};}
+async function tryFetch(label,url,opts){
+  const set=row(label); const t=performance.now();
+  try{
+    const r=await fetch(url,opts);
+    const txt=(await r.text()).slice(0,60).replace(/\n/g," ");
+    if(!r.ok) return set("bad",`HTTP ${r.status} — ${txt}`);
+    return set("ok",`HTTP ${r.status} in ${Math.round(performance.now()-t)} ms · "${txt}"`);
+  }catch(e){ return set("bad",`blocked by the browser: ${e.message}`); }
+}
+function tryTag(label,kind,url){
+  const set=row(label);
+  return new Promise((resolve)=>{
+    const el=document.createElement(kind); let done=false;
+    const finish=(s,d)=>{if(!done){done=true;set(s,d);resolve(s);el.remove();}};
+    el.onload=()=>finish("ok","loaded");
+    el.onerror=()=>finish("bad","refused");
+    el.src=url; el.style.display="none"; document.body.appendChild(el);
+    setTimeout(()=>finish("bad","timed out"),8000);
+  });
+}
+document.getElementById("run").onclick=async()=>{
+  tb.innerHTML=""; document.getElementById("verdict").style.display="none";
+  const t=tok.value.trim(); if(t) localStorage.setItem("gl_token",t);
+  const r1=await tryFetch("Raw file, signed-in session",RAW,{credentials:"include"});
+  const r2=await tryFetch("Raw file, no credentials",RAW,{credentials:"omit"});
+  const r3=await tryFetch("API with your login",API,{credentials:"include"});
+  const r4=t?await tryFetch("API with an access token",API,{headers:{"PRIVATE-TOKEN":t}}):row("API with an access token")("warn","no token entered");
+  const r5=await tryTag("Script tag from GitLab","script",`${GL}/${decodeURIComponent(PROJ)}/-/raw/main/manifest.json`);
+  const r6=await tryTag("Image tag from GitLab","img",`${GL}/uploads/-/system/group/avatar/519/73223261.png`);
+  const r7=await tryFetch("GitHub raw (control)",GH,{});
+  const v=document.getElementById("verdict"); v.style.display="block";
+  const works=[["your GitLab login on raw files",r1],["your GitLab login on the API",r3],["an access token",r4]].filter(([,s])=>s==="ok").map(([n])=>n);
+  v.innerHTML = works.length
+    ? `<b>Good news.</b> The launcher can stream templates straight from GitLab using ${works.join(" or ")}. Nothing needs to be copied to GitHub except the app itself.`
+    : `<b>GitLab is closed to the browser</b>, as expected for a private instance. The launcher can still work — the templates travel with the app from GitHub, and you edit them locally with live reload — but "always the freshest copy from GitLab" isn't possible from a web page without a token.${r7==="ok"?" Fetching from GitHub works fine, so that's the route.":""}`;
+};
+</script>
+</body></html>

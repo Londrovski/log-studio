@@ -1,8 +1,11 @@
-// The app: pick a folder, browse runs, watch one, mark a clip, render it.
+// The app: pick a folder, browse runs, watch one, mark the part worth showing, render it.
 
 import { loadRun } from "./mcap/run.js";
 import { Renderer } from "./render/engine.js";
-import { listTemplates, loadTemplate, config } from "./templates.js";
+import {
+  listTemplates, loadTemplate, config,
+  savedToken, saveToken, tokenInUse, checkToken, gitlabStatus,
+} from "./templates.js";
 import { decodeFrame } from "./export/encode.js";
 import { putJob, newId, toJobFile } from "./jobs.js";
 
@@ -12,23 +15,30 @@ const state = {
   t: 0, playing: false, rate: 1, clip: null, batch: [], current: null,
 };
 
-// ---- run names ------------------------------------------------------------
+// ---- names and numbers ----------------------------------------------------
 // Logs are named 2026-07-18_13-53-04_Trackdrive_FINISHED_drv01m35s.mcap, which tells us
 // nearly everything without opening the file.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function describe(path, size) {
   const base = path.split("/").pop().replace(/\.mcap$/i, "");
-  const m = base.match(/^(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})-(\d{2})_([A-Za-z]+)_([A-Za-z_]+?)(?:_drv(\d+)m(\d+)s)?$/);
-  if (!m) return { path, size, title: base, sub: "", mission: "", outcome: "", when: 0 };
-  const [, date, hh, mm, ss, mission, outcome, dm, ds] = m;
+  const folder = path.includes("/") ? path.split("/")[0] : "";
+  const m = base.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})_([A-Za-z]+)_([A-Za-z_]+?)(?:_drv(\d+)m(\d+)s)?$/);
+  if (!m) return { path, size, folder, title: base, sub: "", mission: "", outcome: "", when: 0, drove: null };
+  const [, yyyy, mo, dd, hh, mi, ss, mission, outcome, dm, ds] = m;
   const drove = dm ? Number(dm) * 60 + Number(ds) : null;
   return {
-    path, size, mission, outcome,
-    title: `${mission} · ${hh}:${mm}`,
-    sub: `${date}${drove != null ? ` · drove ${dm}m ${ds}s` : ""}`,
-    when: Date.parse(`${date}T${hh}:${mm}:${ss}`),
+    path, size, folder, mission, outcome, drove,
+    title: `${mission}${drove != null ? ` · ${fmtDur(drove)}` : ""}`,
+    sub: `${Number(dd)} ${MONTHS[Number(mo) - 1]} ${yyyy} · ${hh}:${mi}`,
+    when: Date.parse(`${yyyy}-${mo}-${dd}T${hh}:${mi}:${ss}`),
   };
 }
 
+const fmtDur = (s) => {
+  const m = Math.floor(s / 60), r = Math.round(s - m * 60);
+  return m ? `${m}m ${String(r).padStart(2, "0")}s` : `${r}s`;
+};
 const fmtSize = (b) => (b > 1 << 30 ? `${(b / 2 ** 30).toFixed(1)} GB` : `${Math.round(b / 2 ** 20)} MB`);
 const fmtTime = (s) => {
   if (!Number.isFinite(s)) return "0:00.0";
@@ -63,39 +73,59 @@ async function chooseFolder() {
     state.files.push({ ...describe(f.path, file.size), handle: f.handle });
   }
   state.files.sort((a, b) => b.when - a.when || a.path.localeCompare(b.path));
+
+  // Sub-folders become a filter, defaulting to Sorted when there is one, since that's
+  // where the runs worth watching live.
+  const folders = [...new Set(state.files.map((f) => f.folder).filter(Boolean))].sort();
+  $("folder").innerHTML = `<option value="">All folders</option>` +
+    folders.map((f) => `<option>${f}</option>`).join("");
+  const sorted = folders.find((f) => /^sorted$/i.test(f));
+  if (sorted) $("folder").value = sorted;
+
   const missions = [...new Set(state.files.map((f) => f.mission).filter(Boolean))].sort();
   $("mission").innerHTML = `<option value="">All missions</option>` + missions.map((m) => `<option>${m}</option>`).join("");
-  $("folderNote").textContent = state.files.length
-    ? `${dir.name} — ${state.files.length} runs. Nothing leaves this machine.`
-    : `No .mcap files under ${dir.name}. Pick the folder that holds Sorted and Raw.`;
+
   drawList();
 }
 
+function visible() {
+  const folder = $("folder").value, mission = $("mission").value;
+  return state.files.filter((f) => (!folder || f.folder === folder) && (!mission || f.mission === mission));
+}
+
 function drawList() {
-  const want = $("mission").value;
-  const list = state.files.filter((f) => !want || f.mission === want);
-  $("runs").innerHTML = list.map((f) => {
+  const list = visible();
+  const runs = $("runs");
+  runs.classList.toggle("batching", state.batch.length > 0);
+  runs.innerHTML = list.map((f) => {
     const cls = f.outcome === "FINISHED" ? "fin" : f.outcome === "EBRAKE" ? "ebrake" : "other";
     const on = state.current?.path === f.path ? " on" : "";
     return `<div class="run${on}" data-path="${f.path}">
-      <input type="checkbox" data-batch="${f.path}" ${state.batch.some((b) => b.path === f.path) ? "checked" : ""}>
+      <input type="checkbox" data-batch="${f.path}" ${state.batch.some((b) => b.entry.path === f.path) ? "checked" : ""}>
       <div><div class="t">${f.title}</div><div class="s">${f.sub}</div></div>
       <div class="b"><span class="tag ${cls}">${f.outcome || "—"}</span><br>${fmtSize(f.size)}</div>
+      <button class="go">View</button>
     </div>`;
-  }).join("") || `<div class="pad hint">Nothing matches that filter.</div>`;
+  }).join("") || `<div class="pad hint">Nothing matches those filters.</div>`;
 
-  $("runs").querySelectorAll(".run").forEach((el) => {
+  if (state.dir) {
+    $("folderNote").textContent = state.files.length
+      ? `${state.dir.name} — ${list.length} of ${state.files.length} runs shown. Nothing leaves this machine.`
+      : `No .mcap files under ${state.dir.name}. Pick the folder that holds Sorted and Raw.`;
+  }
+
+  runs.querySelectorAll(".run").forEach((el) => {
     el.onclick = (e) => {
       if (e.target.matches("input")) return;
       openRun(state.files.find((f) => f.path === el.dataset.path));
     };
   });
-  $("runs").querySelectorAll("input[data-batch]").forEach((el) => {
+  runs.querySelectorAll("input[data-batch]").forEach((el) => {
     el.onchange = () => {
       const f = state.files.find((x) => x.path === el.dataset.batch);
-      if (el.checked) state.batch.push(f);
-      else state.batch = state.batch.filter((b) => b.path !== f.path);
-      $("openBatch").textContent = `Batch (${state.batch.length})`;
+      if (el.checked) addToBatch(f, null);
+      else state.batch = state.batch.filter((b) => b.entry.path !== f.path);
+      refreshBatch();
     };
   });
 }
@@ -107,7 +137,6 @@ async function openRun(entry) {
   state.current = entry;
   drawList();
   $("empty").hidden = true;
-  $("folderNote").textContent = `Opening ${entry.title}…`;
   const file = await entry.handle.getFile();
   try {
     state.run = await loadRun(file, {
@@ -122,36 +151,48 @@ async function openRun(entry) {
     return;
   }
   $("progress").style.width = "0";
-  $("folderNote").textContent = `${state.dir?.name ?? ""} — ${state.files.length} runs.`;
+  if (!state.dir) $("folderNote").textContent = `${entry.title} · ${entry.sub}`;
+  drawList();
   const { start, end } = state.run.span;
   state.t = state.run.meta.driveStart ?? start;
   state.clip = null;
   $("transport").hidden = false;
   $("tTitle").textContent = `${entry.title} · ${entry.sub}`;
   $("tEnd").textContent = fmtTime(end - start);
-  markDrive();
-  await tick(true);
+  drawMarkers();
+  await tick();
 }
 
-function markDrive() {
+/** The green band, the render band, and the little labels above them. */
+function drawMarkers() {
   const { start, end } = state.run.span;
-  const d = state.run.meta.driveStart ?? start;
-  const left = ((d - start) / (end - start)) * 100;
-  $("markDrive").style.left = `${left}%`;
-  $("markDrive").style.width = `${100 - left}%`;
-  drawSel();
-}
+  const span = end - start || 1;
+  const pct = (t) => Math.max(0, Math.min(100, ((t - start) / span) * 100));
 
-function drawSel() {
-  const { start, end } = state.run.span;
-  const el = $("markSel");
-  if (!state.clip) { el.style.width = "0"; $("clipNote").textContent = "Whole run"; return; }
-  const a = ((state.clip.start - start) / (end - start)) * 100;
-  const b = ((state.clip.end - start) / (end - start)) * 100;
-  el.style.left = `${a}%`; el.style.width = `${Math.max(0, b - a)}%`;
-  const len = state.clip.end - state.clip.start;
+  const drive = state.run.meta.driveStart ?? start;
+  $("markDrive").style.left = `${pct(drive)}%`;
+  $("markDrive").style.width = `${100 - pct(drive)}%`;
+
+  const sel = $("markSel");
+  const flags = [`<span class="fdrive" style="left:${pct(drive)}%">car driving from here</span>`];
+  if (state.clip) {
+    sel.style.left = `${pct(state.clip.start)}%`;
+    sel.style.width = `${Math.max(0, pct(state.clip.end) - pct(state.clip.start))}%`;
+    flags.push(`<span class="fin" style="left:${pct(state.clip.start)}%">render begins</span>`);
+    flags.push(`<span class="fout" style="left:${pct(state.clip.end)}%">render ends</span>`);
+  } else {
+    sel.style.width = "0";
+  }
+  $("flags").innerHTML = flags.join("");
+
   const speed = Number($("renderSpeed").value);
-  $("clipNote").textContent = `Clip ${fmtTime(len)} → ${fmtTime(len / speed)} at ${speed}×`;
+  if (state.clip) {
+    const len = state.clip.end - state.clip.start;
+    $("clipNote").textContent =
+      `${fmtTime(state.clip.start - start)} → ${fmtTime(state.clip.end - start)} · ${len.toFixed(1)}s becomes ${(len / speed).toFixed(1)}s at ${speed}×`;
+  } else {
+    $("clipNote").textContent = `the whole run · ${span.toFixed(1)}s becomes ${(span / speed).toFixed(1)}s at ${speed}×`;
+  }
 }
 
 // ---- drawing --------------------------------------------------------------
@@ -166,7 +207,7 @@ async function ensureTemplate() {
 }
 
 let drawing = false;
-async function tick(force = false) {
+async function tick() {
   if (!state.run || drawing) return;
   drawing = true;
   try {
@@ -199,57 +240,146 @@ function play() { if (!state.run) return; state.playing = true; last = 0; $("pla
 function stop() { state.playing = false; $("play").textContent = "Play"; }
 
 // ---- rendering ------------------------------------------------------------
-function clipNow() {
-  const { start, end } = state.run.span;
-  return state.clip ?? { start, end };
-}
-function outName(entry, tpl, clip) {
+const clipNow = () => state.clip ?? { ...state.run.span };
+const settings = () => ({
+  template: state.templateId,
+  speed: Number($("renderSpeed").value),
+  scale: Number($("renderScale").value),
+  quality: $("renderQuality").value,
+  fps: 30,
+});
+
+function outName(entry, tpl, clip, runStart) {
   const base = entry.path.split("/").pop().replace(/\.mcap$/i, "");
-  const s = (x) => fmtTime(x - state.run.span.start).replace(":", "-").replace(".", "-");
-  return `${base}_${tpl}_${s(clip.start)}_${s(clip.end)}.mp4`;
+  const s = (x) => fmtTime(x - runStart).replace(":", "-").replace(".", "-");
+  return clip ? `${base}_${tpl}_${s(clip.start)}_${s(clip.end)}.mp4` : `${base}_${tpl}.mp4`;
 }
-async function makeJob(entry) {
-  const clip = clipNow();
-  return {
-    id: newId(), name: entry.path, handle: entry.handle,
-    template: state.templateId, clip,
-    speed: Number($("renderSpeed").value),
-    scale: Number($("renderScale").value),
-    quality: $("renderQuality").value,
-    fps: 30,
-    outName: outName(entry, state.templateId, clip),
-    status: "queued",
-  };
-}
+
 async function renderNow() {
   if (!state.run || !state.current) return;
-  const job = await makeJob(state.current);
-  await putJob({ ...job, jobs: [job] });
+  const job = {
+    id: newId(), name: state.current.path, handle: state.current.handle,
+    clip: clipNow(), ...settings(),
+    outName: outName(state.current, state.templateId, state.clip, state.run.span.start),
+  };
+  await putJob({ id: job.id, jobs: [job] });
   window.open(`render.html#${job.id}`, "_blank", "noopener");
 }
+
+function addToBatch(entry, clip) {
+  if (!entry) return;
+  state.batch = state.batch.filter((b) => b.entry.path !== entry.path);
+  state.batch.push({ entry, clip, ...settings() });
+}
+
+function refreshBatch() {
+  const n = state.batch.length;
+  $("openBatch").hidden = n === 0;
+  $("openBatch").textContent = `Batch (${n})`;
+  drawList();
+  if (n === 0) { $("jobs").classList.remove("on"); return; }
+  const el = $("jobs");
+  el.innerHTML = `<table><thead><tr><th>Run</th><th style="width:150px">Part rendered</th><th style="width:110px">Template</th><th style="width:70px">Speed</th><th style="width:40px"></th></tr></thead><tbody>
+    ${state.batch.map((b, i) => `<tr>
+      <td>${b.entry.title} · ${b.entry.sub}</td>
+      <td>${b.clip ? `${fmtTime(b.clip.start - b.clip.runStart)} → ${fmtTime(b.clip.end - b.clip.runStart)}` : "whole run"}</td>
+      <td>${b.template}</td><td>${b.speed}×</td>
+      <td><button class="drop" data-drop="${i}">×</button></td></tr>`).join("")}
+  </tbody></table>
+  <div class="row"><button id="runBatch">Render all ${n}</button>
+    <button class="ghost" id="saveJobs">Save job file</button>
+    <button class="quiet" id="clearBatch">Clear the batch</button></div>`;
+  el.querySelectorAll("[data-drop]").forEach((b) => {
+    b.onclick = () => { state.batch.splice(Number(b.dataset.drop), 1); refreshBatch(); };
+  });
+  $("runBatch").onclick = renderBatch;
+  $("saveJobs").onclick = saveJobFile;
+  $("clearBatch").onclick = () => { state.batch = []; refreshBatch(); };
+}
+
 async function renderBatch() {
   if (!state.batch.length) return;
-  const jobs = [];
-  for (const entry of state.batch) {
-    jobs.push({
-      id: newId(), name: entry.path, handle: entry.handle,
-      template: state.templateId, clip: null,     // whole run unless the app had it open
-      speed: Number($("renderSpeed").value), scale: Number($("renderScale").value),
-      quality: $("renderQuality").value, fps: 30,
-      outName: `${entry.path.split("/").pop().replace(/\.mcap$/i, "")}_${state.templateId}.mp4`,
-    });
-  }
+  const jobs = state.batch.map((b) => ({
+    id: newId(), name: b.entry.path, handle: b.entry.handle,
+    clip: b.clip, template: b.template, speed: b.speed, scale: b.scale,
+    quality: b.quality, fps: b.fps,
+    outName: outName(b.entry, b.template, b.clip, b.clip?.runStart ?? 0),
+  }));
   const id = newId();
   await putJob({ id, jobs });
   window.open(`render.html#${id}`, "_blank", "noopener");
 }
+
 function saveJobFile() {
-  const jobs = state.batch.length
-    ? state.batch.map((e) => ({ name: e.path, template: state.templateId, clip: { start: 0, end: 0 }, speed: 1, fps: 30, quality: $("renderQuality").value, scale: 1, outName: `${e.path.split("/").pop()}.mp4` }))
-    : [{ name: state.current.path, template: state.templateId, clip: clipNow(), speed: Number($("renderSpeed").value), fps: 30, quality: $("renderQuality").value, scale: Number($("renderScale").value), outName: outName(state.current, state.templateId, clipNow()) }];
-  const blob = new Blob([JSON.stringify(toJobFile(jobs), null, 2)], { type: "application/json" });
+  const rows = state.batch.length
+    ? state.batch.map((b) => ({
+        name: b.entry.path, template: b.template,
+        clip: b.clip ?? { start: 0, end: 0 }, speed: b.speed, fps: b.fps,
+        quality: b.quality, scale: b.scale,
+        outName: outName(b.entry, b.template, b.clip, b.clip?.runStart ?? 0),
+      }))
+    : [{
+        name: state.current.path, clip: clipNow(), ...settings(),
+        outName: outName(state.current, state.templateId, state.clip, state.run.span.start),
+      }];
+  const blob = new Blob([JSON.stringify(toJobFile(rows), null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = "render-jobs.json"; a.click();
+}
+
+// ---- settings and the GitLab banner ---------------------------------------
+async function showTokenSource() {
+  const { source } = await tokenInUse();
+  $("tokenSource").textContent = `Currently using the token ${source}.`;
+}
+
+async function showBanner() {
+  // Only worth saying when a token exists and has stopped working. With no token at
+  // all, using the built-in templates is the normal, quiet state.
+  const { token } = await tokenInUse();
+  if (!gitlabStatus.error || !token) { $("banner").hidden = true; return; }
+  $("banner").hidden = false;
+  $("banner").innerHTML = `<b>Using the templates built into the app.</b>
+    GitLab could not be read — ${gitlabStatus.error}. Editing a template in GitLab will not show up here until this is fixed.
+    <button id="fixToken">Fix the token</button>`;
+  $("fixToken").onclick = () => $("settings").showModal();
+}
+
+async function wireSettings() {
+  $("openSettings").onclick = async () => {
+    $("tokenInput").value = savedToken();
+    $("tokenStatus").className = "status";
+    $("tokenStatus").textContent = gitlabStatus.error
+      ? `Right now GitLab cannot be read: ${gitlabStatus.error}`
+      : "";
+    await showTokenSource();
+    $("settings").showModal();
+  };
+  const setStatus = (cls, msg) => { $("tokenStatus").className = `status ${cls}`; $("tokenStatus").textContent = msg; };
+  $("testToken").onclick = async () => {
+    const token = $("tokenInput").value.trim();
+    setStatus("busy", "Asking GitLab…");
+    const r = await checkToken(token);
+    setStatus(r.ok ? "ok" : "bad", r.ok ? r.message : `No — ${r.message}. Make a project access token on log-studio-assets with read_api, read_repository and read_registry.`);
+  };
+  $("saveToken").onclick = async () => {
+    const token = $("tokenInput").value.trim();
+    saveToken(token);
+    const r = token ? await checkToken(token) : { ok: false, message: "cleared" };
+    if (r.ok) {
+      gitlabStatus.error = null;
+      setStatus("ok", `${r.message} Saved on this machine — reload to pick up the GitLab templates.`);
+    } else {
+      setStatus("bad", `Saved, but it still does not work: ${r.message}`);
+    }
+    await showBanner();
+    await showTokenSource();
+  };
+  $("clearToken").onclick = async () => {
+    saveToken(""); $("tokenInput").value = "";
+    setStatus("busy", "Cleared. The app will use the token built into it, if there is one.");
+    await showTokenSource();
+  };
 }
 
 // ---- wiring ---------------------------------------------------------------
@@ -262,6 +392,7 @@ $("fileInput").onchange = async (e) => {
   const entry = { ...describe(file.name, file.size), handle: { getFile: async () => file } };
   state.files = [entry]; drawList(); openRun(entry);
 };
+$("folder").onchange = drawList;
 $("mission").onchange = drawList;
 $("play").onclick = () => (state.playing ? stop() : play());
 $("rate").onchange = () => { state.rate = Number($("rate").value); };
@@ -275,41 +406,29 @@ $("seek").oninput = () => {
 };
 $("seek").onchange = () => { seeking = false; };
 $("setIn").onclick = () => {
-  const { end } = state.run.span;
-  state.clip = { start: state.t, end: state.clip?.end ?? end };
+  const { start, end } = state.run.span;
+  state.clip = { start: state.t, end: state.clip?.end ?? end, runStart: start };
   if (state.clip.end <= state.clip.start) state.clip.end = end;
-  drawSel();
+  drawMarkers();
 };
 $("setOut").onclick = () => {
   const { start } = state.run.span;
-  state.clip = { start: state.clip?.start ?? start, end: state.t };
+  state.clip = { start: state.clip?.start ?? start, end: state.t, runStart: start };
   if (state.clip.end <= state.clip.start) state.clip.start = start;
-  drawSel();
+  drawMarkers();
 };
-$("clearSel").onclick = () => { state.clip = null; drawSel(); };
-$("renderSpeed").onchange = drawSel;
+$("clearSel").onclick = () => { state.clip = null; drawMarkers(); };
+$("renderSpeed").onchange = () => drawMarkers();
 $("render").onclick = renderNow;
 $("queue").onclick = () => {
   if (!state.current) return;
-  if (!state.batch.some((b) => b.path === state.current.path)) state.batch.push(state.current);
-  $("openBatch").textContent = `Batch (${state.batch.length})`;
-  drawList();
+  addToBatch(state.current, state.clip ? { ...state.clip, runStart: state.run.span.start } : null);
+  refreshBatch();
+  $("jobs").classList.add("on");
 };
-$("openBatch").onclick = () => {
-  const el = $("jobs");
-  el.classList.toggle("on");
-  el.innerHTML = state.batch.length
-    ? `<div class="row spread"><span>${state.batch.length} runs queued, whole run each, ${state.templateId} template.</span>
-        <span class="row"><button id="runBatch">Render all</button><button class="ghost" id="saveJobs">Save job file</button><button class="quiet" id="clearBatch">Clear</button></span></div>`
-    : `<span>Tick runs in the list, or use “Add to batch”, then render them all in one go or save a job file for a Jetson to chew through overnight.</span>`;
-  if (state.batch.length) {
-    $("runBatch").onclick = renderBatch;
-    $("saveJobs").onclick = saveJobFile;
-    $("clearBatch").onclick = () => { state.batch = []; $("openBatch").textContent = "Batch (0)"; drawList(); el.classList.remove("on"); };
-  }
-};
+$("openBatch").onclick = () => $("jobs").classList.toggle("on");
 document.addEventListener("keydown", (e) => {
-  if (e.target.matches("input,select")) return;
+  if (e.target.matches("input,select,textarea") || $("settings").open) return;
   if (e.code === "Space") { e.preventDefault(); state.playing ? stop() : play(); }
   if (e.key === "i") $("setIn").click();
   if (e.key === "o") $("setOut").click();
@@ -318,15 +437,16 @@ document.addEventListener("keydown", (e) => {
 });
 
 (async () => {
-  const cfg = await config();
-  $("ver").textContent = cfg.version ?? "";
+  await config();
+  await wireSettings();
   let templates = [];
   try { templates = await listTemplates(); } catch { templates = [{ id: "showcase", name: "Showcase 16:9" }]; }
   $("template").innerHTML = templates.map((t) => `<option value="${t.id}">${t.name}</option>`).join("");
   $("template").onchange = async () => {
     state.templateId = $("template").value;
     state.renderer = null;
-    await tick(true);
+    await tick();
   };
+  await showBanner();
   await document.fonts.ready;
 })();

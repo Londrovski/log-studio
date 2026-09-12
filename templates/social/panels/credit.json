@@ -1,0 +1,8 @@
+{
+  "type": "label",
+  "text": "teambathracingelectric.com",
+  "size": 26,
+  "weight": 500,
+  "colour": "@theme.muted",
+  "align": "center"
+}

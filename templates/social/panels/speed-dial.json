@@ -1,0 +1,12 @@
+{
+  "type": "dial",
+  "label": "SPEED",
+  "source": { "topic": "/control/ddt/vehicle_speed" },
+  "max": 6,
+  "ticks": 6,
+  "unit": "m/s",
+  "decimals": 2,
+  "scale": 1.6,
+  "fill": "@theme.blue",
+  "valueColour": "@theme.blue"
+}

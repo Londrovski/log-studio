@@ -1,0 +1,20 @@
+{
+  "id": "social",
+  "name": "Social 9:16",
+  "description": "Built for a phone: camera, a big square map, and two large readouts. No plots, everything half again the desktop size, and clear of Instagram's own buttons.",
+  "canvas": { "width": 1080, "height": 1920, "background": "#ffffff" },
+  "fps": 30,
+  "theme": "theme.json",
+  "layout": [
+    { "panel": "panels/header.json", "area": [24, 36, 1032, 72] },
+    { "panel": "panels/camera.json", "area": [24, 138, 1032, 581] },
+    { "panel": "panels/map.json", "area": [24, 735, 1032, 660] },
+    { "panel": "panels/speed-dial.json", "area": [24, 1411, 508, 196] },
+    { "panel": "panels/steering.json", "area": [548, 1411, 508, 196] },
+    { "panel": "panels/lap.json", "area": [24, 1623, 333, 160] },
+    { "panel": "panels/distance.json", "area": [373, 1623, 333, 160] },
+    { "panel": "panels/cones.json", "area": [722, 1623, 334, 160] },
+    { "panel": "panels/progress.json", "area": [24, 1805, 1032, 6] },
+    { "panel": "panels/credit.json", "area": [24, 1836, 1032, 30] }
+  ]
+}

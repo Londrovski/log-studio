@@ -1,0 +1,14 @@
+{
+  "type": "slider",
+  "label": "STEERING REQUEST",
+  "source": { "topic": "/control/ddt/steer_request" },
+  "sign": -1,
+  "range": [-25, 25],
+  "unit": "°",
+  "decimals": 1,
+  "scale": 1.6,
+  "endLabels": ["L", "R"],
+  "tickValues": [-25, -20, -10, 0, 10, 20, 25],
+  "tickLabels": [-20, 0, 20],
+  "fill": "@theme.yellow"
+}

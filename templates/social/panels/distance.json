@@ -1,0 +1,7 @@
+{
+  "type": "stat",
+  "label": "DISTANCE",
+  "source": { "topic": "@distance" },
+  "unit": "m",
+  "scale": 1.35
+}

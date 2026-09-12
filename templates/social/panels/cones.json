@@ -1,0 +1,6 @@
+{
+  "type": "stat",
+  "label": "CONES IN MAP",
+  "source": { "derived": "coneCount", "topic": "/graph_slam/landmarks" },
+  "scale": 1.35
+}

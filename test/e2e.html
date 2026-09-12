@@ -1,0 +1,46 @@
+<!doctype html><meta charset="utf-8"><title>Log Studio end-to-end check</title>
+<!--
+  Driven by test/e2e.mjs. It feeds a real .mcap through a file input, which is the same
+  path the app uses, so anything that passes here works in the app.
+-->
+<input id="f" type="file">
+<script type="module">
+import { loadRun } from "../src/mcap/run.js";
+import { Renderer } from "../src/render/engine.js";
+import { loadTemplate } from "../src/templates.js";
+import { renderToMp4, decodeFrame } from "../src/export/encode.js";
+
+window.__go = async (file, opts) => {
+  const log = [];
+  const t0 = performance.now();
+  const run = await loadRun(file);
+  log.push(`run loaded in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
+  log.push(`scalars=${run.scalars.size} tf=${run.tf.size} scene=${[...run.scene].filter(([, v]) => v.t.length).length} camera=${!!run.camera}`);
+  log.push(`drive starts ${(run.meta.driveStart - run.span.start).toFixed(1)}s in, heading ${run.heading ? run.heading.length + " samples" : "none"}`);
+
+  const tpl = await loadTemplate(opts.template, { source: "bundled" });
+  const r = new Renderer(tpl);
+  const c = document.createElement("canvas");
+  c.width = r.width; c.height = r.height;
+  const ctx = c.getContext("2d", { alpha: false });
+  const t = run.span.start + opts.at;
+  if (run.camera) { await run.camera.ensure(t); await decodeFrame(run.camera.frameAt(t)); }
+  await document.fonts.ready;
+  r.draw(ctx, run, t, { clip: run.span });
+  const still = c.toDataURL("image/png");
+
+  let mp4 = null;
+  if (opts.seconds) {
+    const tm = performance.now();
+    const blob = await renderToMp4(r, run, { clip: { start: t, end: t + opts.seconds }, fps: 30, quality: "web" });
+    log.push(`rendered ${opts.seconds}s at ${r.width}x${r.height} in ${((performance.now() - tm) / 1000).toFixed(1)}s -> ${(blob.size / 1048576).toFixed(2)} MB (${blob.codec})`);
+    mp4 = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+  }
+  return { log, still, mp4 };
+};
+
+document.getElementById("f").onchange = async (e) => {
+  try { window.__result = await window.__go(e.target.files[0], window.__opts); }
+  catch (err) { window.__result = { log: ["ERROR " + err.message + "\n" + err.stack], still: null }; }
+};
+</script>

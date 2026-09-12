@@ -15,7 +15,10 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(
 
 async function main() {
   $("sub").textContent = "Reading the render job…";
-  const id = location.hash.slice(1);
+  // A query parameter rather than a fragment, because Cloudflare redirects
+  // /render.html to /render and a query survives that beyond doubt. The fragment is
+  // still read so older links, and anything opened by hand, keep working.
+  const id = new URLSearchParams(location.search).get("job") || location.hash.slice(1);
   const record = await getJob(id);
   if (!record) { $("sub").textContent = "That render job has gone. Start it again from the main window."; return; }
   const jobs = record.jobs ?? [record];

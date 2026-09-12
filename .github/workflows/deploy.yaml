@@ -2,10 +2,10 @@ name: Deploy
 
 # The same shape as tbre-website's CI: build, then hand dist/ to Cloudflare with
 # wrangler. It needs two secrets, CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID —
-# the same pair the website uses. If the organisation holds them as org-level secrets
-# and this repo is in scope, there is nothing to add.
+# the same pair the website uses, held as organisation secrets.
 #
-# Until they exist, the deploy step skips with a note rather than failing red.
+# Naming an environment is what makes GitHub record each deploy, so the repo sidebar
+# shows when the site last went out and links straight to it.
 
 on:
   push:
@@ -23,6 +23,9 @@ jobs:
   deploy:
     name: Build and deploy
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://log-studio.teambathracingelectric.com
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -42,4 +45,4 @@ jobs:
       - name: Explain why nothing was deployed
         if: env.CLOUDFLARE_API_TOKEN == ''
         run: |
-          echo "::notice::Built fine, but CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are not set on this repository, so nothing was deployed. Add them under Settings - Secrets and variables - Actions, or give this repo access to the organisation secrets the website already uses."
+          echo "::notice::Built fine, but CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are not readable from this repository, so nothing was deployed. Check the organisation secrets include this repo, or add them under Settings - Secrets and variables - Actions."

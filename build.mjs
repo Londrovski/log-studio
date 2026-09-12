@@ -11,13 +11,16 @@ const OUT = "dist";
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(`${OUT}/vendor`, { recursive: true });
 
+// The bundle is written into vendor/ rather than straight into dist/, so that src/
+// resolves the same whether you open the repo directly or serve dist/. Without that,
+// the app and its own tests only work after a build, which is a trap.
 await esbuild.build({
   entryPoints: ["vendor/entry.js"],
   bundle: true,
   format: "esm",
   platform: "browser",
   minify: true,
-  outfile: `${OUT}/vendor/bundle.js`,
+  outfile: "vendor/bundle.js",
   alias: { fs: "./vendor/node-stub.js", path: "./vendor/node-stub.js" },
   inject: ["./vendor/buffer-shim.js"],
   loader: { ".wasm": "file" },
@@ -25,8 +28,9 @@ await esbuild.build({
   logLevel: "info",
 });
 
-// Emscripten resolves its .wasm against the page, not the script, so it goes at the root.
-fs.copyFileSync(`${OUT}/vendor/wasm-zstd.wasm`, `${OUT}/wasm-zstd.wasm`);
+// Emscripten resolves its .wasm against the page, not the script, so it goes at the
+// root — of dist/, of the repo, and beside the test page, all for the same reason.
+for (const dir of [".", "test"]) fs.copyFileSync("vendor/wasm-zstd.wasm", `${dir}/wasm-zstd.wasm`);
 
 const copy = (src) => {
   const stat = fs.statSync(src);
@@ -38,7 +42,7 @@ const copy = (src) => {
     fs.copyFileSync(src, path.join(OUT, src));
   }
 };
-for (const f of ["index.html", "render.html", "token-check.html", "app.css", "config.json", "src", "templates"]) copy(f);
+for (const f of ["index.html", "render.html", "token-check.html", "app.css", "config.json", "wasm-zstd.wasm", "src", "templates", "vendor"]) copy(f);
 
 // A service worker turns the page into an installable app that still works with no
 // internet, which matters in a paddock at Silverstone.

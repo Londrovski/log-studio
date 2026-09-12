@@ -2,3 +2,6 @@ node_modules/
 dist/
 out/
 *.log
+vendor/bundle.js
+wasm-zstd.wasm
+test/wasm-zstd.wasm

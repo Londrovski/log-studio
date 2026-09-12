@@ -1,0 +1,10 @@
+{
+  "version": "0.1",
+  "gitlab": {
+    "host": "https://gitlab.bath.ac.uk",
+    "projectId": "369",
+    "ref": "main",
+    "_comment": "A read-only access token scoped to the log-studio-assets project. Anyone can read it here, so it must not be a personal token — open token-check.html to see what a token reaches before pasting it in. Leave empty to use the templates bundled with the app.",
+    "token": ""
+  }
+}

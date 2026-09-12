@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rendering — TBRe Log Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+<style>
+ body{overflow:auto}
+ .wrap{max-width:900px;margin:0 auto;padding:28px 24px}
+ canvas{width:100%;border-radius:14px;border:1px solid var(--line);background:#fff}
+ .job{padding:12px 0;border-bottom:1px solid var(--line)}
+ .track{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:8px}
+ .track i{display:block;height:100%;background:var(--blue);width:0;transition:width .15s linear}
+ h1{font-size:20px;margin:0 0 4px} h1 b{color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><b>TBRe</b> Log Studio — rendering</h1>
+  <p class="hint" id="sub">Keep this tab open. The main window stays usable while this runs.</p>
+  <div class="row" style="margin-bottom:14px">
+    <button class="ghost" id="cancel">Cancel</button>
+    <span class="hint" id="overall"></span>
+  </div>
+  <canvas id="preview" width="1920" height="1080"></canvas>
+  <div id="list"></div>
+</div>
+<script type="module" src="src/render-tab.js"></script>
+</body>
+</html>

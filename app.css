@@ -19,10 +19,13 @@ a{color:var(--blue)}
 aside{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
 main{display:flex;flex-direction:column;min-height:0}
 
-.brand{padding:18px 20px 12px;display:flex;align-items:baseline;gap:8px}
-.brand b{color:var(--blue);font-size:20px}
-.brand span{font-size:20px;font-weight:600}
-.brand small{margin-left:auto;color:var(--faint);font-size:12px}
+.brand{padding:18px 20px 12px;display:flex;align-items:center;gap:9px}
+.brand .mark{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.brand .mark b{color:var(--blue)}
+.brand .mark i{color:var(--ora);font-style:normal}
+.brand .prod{font-size:20px;font-weight:500;color:var(--ink)}
+.brand .icon{margin-left:auto;background:transparent;color:var(--mut);font-size:19px;padding:2px 8px;line-height:1}
+.brand .icon:hover{color:var(--ink)}
 
 .pad{padding:12px 20px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -51,8 +54,8 @@ canvas#view{max-width:100%;max-height:100%;border-radius:14px;border:1px solid v
 .scrub input::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:var(--line);margin-top:13px}
 .scrub input::-webkit-slider-thumb{appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--blue);margin-top:8px}
 .marks{position:absolute;inset:13px 0 auto;height:8px;border-radius:4px;pointer-events:none;overflow:hidden}
-.marks .sel{position:absolute;top:0;bottom:0;background:rgba(16,91,171,.28)}
-.marks .drv{position:absolute;top:0;bottom:0;background:rgba(22,163,74,.35)}
+.marks .sel{position:absolute;top:-2px;bottom:-2px;background:var(--blue);border-radius:3px;box-shadow:0 0 0 1px rgba(255,255,255,.9)}
+.marks .drv{position:absolute;top:0;bottom:0;background:rgba(22,163,74,.28)}
 .times{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
 .empty{max-width:52ch;text-align:center;color:var(--mut)}
 .empty h2{color:var(--ink);font-size:18px;margin:0 0 6px}
@@ -60,3 +63,57 @@ canvas#view{max-width:100%;max-height:100%;border-radius:14px;border:1px solid v
 .bar{height:3px;background:var(--line)}
 .jobs{border-top:1px solid var(--line);padding:10px 20px;font-size:13px;color:var(--mut);display:none}
 .jobs.on{display:block}
+
+/* ---- run list ------------------------------------------------------------ */
+.run{grid-template-columns:1fr auto auto}
+#runs.batching .run{grid-template-columns:22px 1fr auto auto}
+#runs:not(.batching) .run input[data-batch]{display:none}
+.run .go{opacity:.6;background:var(--card);color:var(--blue);font-size:12px;padding:5px 12px;border-radius:999px}
+.run:hover .go,.run.on .go{opacity:1}
+.run.on .go{background:var(--blue);color:#fff}
+
+/* ---- timeline ------------------------------------------------------------ */
+.scrubwrap{display:flex;flex-direction:column}
+.flags{position:relative;height:19px;font-size:10.5px;font-weight:600;letter-spacing:.02em}
+.flags span{position:absolute;top:0;white-space:nowrap;transform:translateX(-2px);
+  padding:1px 6px;border-radius:5px;line-height:1.5}
+.flags .fdrive{color:#15803d;background:#dcfce7}
+.flags .fin{color:var(--blue);background:#e4eefa}
+.flags .fout{color:var(--blue);background:#e4eefa;transform:translateX(calc(-100% + 2px))}
+.flags span::after{content:"";position:absolute;left:4px;top:100%;width:1px;height:5px;background:currentColor}
+.flags .fout::after{left:auto;right:4px}
+
+/* ---- the two halves of the bottom bar ------------------------------------ */
+.panes{display:grid;grid-template-columns:auto 1fr;gap:14px 26px;align-items:start}
+.pane{display:flex;flex-direction:column;gap:8px;min-width:0}
+.pane.right{border-left:1px solid var(--line);padding-left:26px}
+.pane h4{margin:0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.pane h4 .clipline{text-transform:none;letter-spacing:0;font-size:12px;color:var(--blue);font-weight:600;margin-left:6px}
+@media (max-width:1180px){
+  .panes{grid-template-columns:1fr}
+  .pane.right{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:12px}
+}
+
+/* ---- banner and settings ------------------------------------------------- */
+.banner{margin:0 20px 10px;padding:10px 12px;border-radius:12px;background:#fff7ed;
+  border:1px solid #fed7aa;color:#9a3412;font-size:12.5px;line-height:1.45}
+.banner b{display:block;margin-bottom:2px}
+.banner button{margin-top:8px;background:var(--ora);font-size:12px;padding:6px 14px}
+dialog{border:0;border-radius:18px;padding:0;max-width:560px;width:calc(100% - 32px);
+  box-shadow:0 24px 60px rgba(0,0,0,.18);color:var(--ink)}
+dialog::backdrop{background:rgba(24,24,27,.4)}
+.sheet{padding:24px 26px 22px;font:15px/1.5 Poppins,"Segoe UI",system-ui,sans-serif}
+.sheet h3{margin:0 0 8px;font-size:19px}
+.sheet input[type=password]{width:100%}
+.sheet details{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;font-size:13.5px;color:var(--mut)}
+.sheet details summary{cursor:pointer;color:var(--ink);font-weight:600;font-size:14px}
+.sheet details ul{margin:8px 0;padding-left:20px}
+.sheet code{background:var(--card);padding:1px 5px;border-radius:5px;font-size:12.5px}
+.status{font-size:13px;min-height:20px}
+.status.ok{color:#15803d}.status.bad{color:#b91c1c}.status.busy{color:var(--mut)}
+
+/* ---- batch --------------------------------------------------------------- */
+.jobs table{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 10px}
+.jobs td,.jobs th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left}
+.jobs th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.jobs .drop{background:transparent;color:var(--mut);padding:2px 8px}

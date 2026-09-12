@@ -1,0 +1,6 @@
+{
+  "type": "stat",
+  "label": "PERCEPTION",
+  "source": { "topic": "/taskmgr/perception_latency_ms" },
+  "unit": "ms"
+}

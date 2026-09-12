@@ -1,0 +1,22 @@
+{
+  "id": "showcase",
+  "name": "Showcase 16:9",
+  "description": "The white website style: camera and map side by side, readouts and rolling plots beneath.",
+  "canvas": { "width": 1920, "height": 1080, "background": "#ffffff" },
+  "fps": 30,
+  "theme": "theme.json",
+  "layout": [
+    { "panel": "panels/header.json", "area": [32, 28, 1856, 60] },
+    { "panel": "panels/camera.json", "area": [32, 100, 1104, 621] },
+    { "panel": "panels/map.json", "area": [1152, 100, 736, 621] },
+    { "panel": "panels/speed-dial.json", "area": [32, 737, 355, 118] },
+    { "panel": "panels/steering.json", "area": [403, 737, 533, 118] },
+    { "panel": "panels/lap.json", "area": [952, 737, 222, 118] },
+    { "panel": "panels/distance.json", "area": [1190, 737, 222, 118] },
+    { "panel": "panels/cones.json", "area": [1428, 737, 222, 118] },
+    { "panel": "panels/perception.json", "area": [1666, 737, 222, 118] },
+    { "panel": "panels/wheel-speeds.json", "area": [32, 871, 920, 185] },
+    { "panel": "panels/pose.json", "area": [968, 871, 920, 185] },
+    { "panel": "panels/progress.json", "area": [32, 1068, 1856, 4] }
+  ]
+}

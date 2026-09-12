@@ -1,0 +1,11 @@
+{
+  "type": "plot",
+  "label": "POSE  ·  ODOMETRY vs SLAM (m)",
+  "window": 20,
+  "lines": [
+    { "label": "odom x", "source": { "topic": "/frame/odom", "field": "x" }, "colour": "@theme.blue" },
+    { "label": "slam x", "source": { "topic": "/frame/graph_slam_car", "field": "x" }, "colour": "@theme.orange" },
+    { "label": "odom y", "source": { "topic": "/frame/odom", "field": "y" }, "colour": "#ca8a04" },
+    { "label": "slam y", "source": { "topic": "/frame/graph_slam_car", "field": "y" }, "colour": "@theme.green" }
+  ]
+}

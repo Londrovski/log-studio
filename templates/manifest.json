@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "templates": [
+    { "id": "showcase", "name": "Showcase 16:9", "canvas": "1920×1080", "description": "The white website style." },
+    { "id": "social", "name": "Social 9:16", "canvas": "1080×1920", "description": "Vertical, for Instagram and TikTok." }
+  ]
+}

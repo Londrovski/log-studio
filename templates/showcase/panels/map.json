@@ -1,0 +1,24 @@
+{
+  "type": "map",
+  "label": "SLAM MAP  ·  PLANNED PATH",
+  "frame": "/frame/graph_slam_car",
+  "viewAhead": 15,
+  "carAt": 0.74,
+  "grid": true,
+  "background": "#fafafb",
+  "layers": [
+    { "kind": "lines", "topic": "/path_planner/start_zone", "colour": "#bebec8", "width": 2 },
+    { "kind": "lines", "topic": "/path_planner/delaunay", "colour": "#ced6e2", "width": 1 },
+    { "kind": "lines", "topic": "/path_planner/centreline", "colour": "@theme.magenta", "width": 4 },
+    { "kind": "lines", "topic": "/path_planner/extrapolation", "colour": "@theme.red", "width": 2 },
+    { "kind": "points", "topic": "/path_planner/candidates_shifted", "colour": "@theme.cyan", "radius": 3 },
+    { "kind": "cones", "topic": "/graph_slam/landmarks" },
+    { "kind": "target", "topic": "/path_planner/target", "colour": "@theme.green", "radius": 7 }
+  ],
+  "legend": [
+    { "label": "Blue cone", "colour": "@theme.coneBlue" },
+    { "label": "Yellow cone", "colour": "@theme.coneYellow" },
+    { "label": "Planned path", "colour": "@theme.magenta" },
+    { "label": "Car", "colour": "@theme.red" }
+  ]
+}

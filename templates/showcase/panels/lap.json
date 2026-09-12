@@ -1,0 +1,5 @@
+{
+  "type": "stat",
+  "label": "LAP",
+  "source": { "topic": "/control/driver/lap_count", "interpolate": false }
+}

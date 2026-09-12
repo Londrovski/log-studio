@@ -1,0 +1,16 @@
+{
+  "type": "slider",
+  "label": "STEERING REQUEST",
+  "source": { "topic": "/control/ddt/steer_request" },
+
+  "_sign": "The log counts a left turn as positive. A screen counts right as positive. This one character is the whole fix.",
+  "sign": -1,
+
+  "range": [-25, 25],
+  "unit": "°",
+  "decimals": 1,
+  "endLabels": ["L", "R"],
+  "tickValues": [-25, -20, -10, 0, 10, 20, 25],
+  "tickLabels": [-20, 0, 20],
+  "fill": "@theme.yellow"
+}

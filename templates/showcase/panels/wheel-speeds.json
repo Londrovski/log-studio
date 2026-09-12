@@ -1,0 +1,10 @@
+{
+  "type": "plot",
+  "label": "WHEEL SPEEDS",
+  "window": 20,
+  "lines": [
+    { "label": "rpm_request", "source": { "topic": "/control/ddt/rpm_request" }, "colour": "@theme.orange" },
+    { "label": "wheel_speed/rl", "source": { "topic": "/control/ddt/wheel_speed/rl" }, "colour": "#ca8a04" },
+    { "label": "wheel_speed/rr", "source": { "topic": "/control/ddt/wheel_speed/rr" }, "colour": "@theme.green" }
+  ]
+}

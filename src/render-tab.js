@@ -14,10 +14,12 @@ $("cancel").onclick = () => controller.abort();
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
 async function main() {
+  $("sub").textContent = "Reading the render job…";
   const id = location.hash.slice(1);
   const record = await getJob(id);
   if (!record) { $("sub").textContent = "That render job has gone. Start it again from the main window."; return; }
   const jobs = record.jobs ?? [record];
+  $("sub").textContent = "Keep this tab open. The main window stays usable while this runs.";
 
   $("list").innerHTML = jobs.map((j, i) => `
     <div class="job" id="j${i}">
@@ -30,7 +32,8 @@ async function main() {
     $(`s${i}`).textContent = "opening the log…";
     $("overall").textContent = `${done} of ${jobs.length} finished`;
     try {
-      const file = await job.handle.getFile();
+      // A job carries either a handle from the folder picker or the File itself.
+      const file = job.file ?? await job.handle.getFile();
       const run = await loadRun(file, {
         onProgress: (p) => { $(`p${i}`).style.width = `${p * 20}%`; },
       });
@@ -62,6 +65,7 @@ async function main() {
       done++;
     } catch (err) {
       $(`s${i}`).textContent = err.name === "AbortError" ? "cancelled" : `failed: ${err.message}`;
+      console.error(err);
       if (err.name === "AbortError") break;
     }
   }
@@ -72,4 +76,7 @@ async function main() {
   await dropJob(id);
 }
 
-main().catch((e) => { $("sub").textContent = `Something went wrong: ${e.message}`; });
+main().catch((e) => {
+  $("sub").textContent = `Something went wrong: ${e.message}`;
+  console.error(e);
+});

@@ -272,7 +272,7 @@ async function renderNow() {
     $("folderNote").textContent = `Could not start the render: ${err.message}`;
     return;
   }
-  const tab = window.open(`render.html#${job.id}`, "_blank");
+  const tab = window.open(`render.html?job=${job.id}`, "_blank");
   if (!tab) $("folderNote").textContent = "The render tab was blocked — allow pop-ups for this site and try again.";
 }
 
@@ -323,7 +323,7 @@ async function renderBatch() {
     $("folderNote").textContent = `Could not start the batch: ${err.message}`;
     return;
   }
-  const tab = window.open(`render.html#${id}`, "_blank");
+  const tab = window.open(`render.html?job=${id}`, "_blank");
   if (!tab) $("folderNote").textContent = "The render tab was blocked — allow pop-ups for this site and try again.";
 }
 

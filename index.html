@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TBRe Log Studio</title>
+<title>TBRe AI Log Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -14,21 +14,34 @@
 <body>
 <div id="app">
   <aside>
-    <div class="brand"><b>TBRe</b><span>Log Studio</span><small id="ver"></small></div>
+    <div class="brand">
+      <span class="mark"><b>TBRe</b><i>AI</i></span>
+      <span class="prod">Log Studio</span>
+      <button class="icon" id="openSettings" title="Settings">&#9881;</button>
+    </div>
+
     <div class="pad row">
       <button id="pick">Choose logs folder</button>
       <button id="pickFile" class="ghost">Single file</button>
-      <input id="fileInput" type="file" accept=".mcap" hidden>
     </div>
+    <input id="fileInput" type="file" accept=".mcap" hidden>
+
     <div class="pad row spread" style="padding-top:0">
-      <label class="field" style="flex:1">Template
-        <select id="template"></select>
+      <label class="field" style="flex:1">Folder
+        <select id="folder"><option value="">All</option></select>
       </label>
       <label class="field" style="flex:1">Mission
         <select id="mission"><option value="">All</option></select>
       </label>
     </div>
+    <div class="pad" style="padding-top:0">
+      <label class="field">Template
+        <select id="template"></select>
+      </label>
+    </div>
+
     <div class="pad hint" id="folderNote" style="padding-top:0">No folder chosen yet. Your logs never leave this machine.</div>
+    <div id="banner" class="banner" hidden></div>
     <div class="bar"><div id="progress"></div></div>
     <div id="runs"></div>
   </aside>
@@ -38,64 +51,104 @@
       <canvas id="view" width="1920" height="1080"></canvas>
       <div class="empty" id="empty">
         <h2>Pick your logs folder to begin</h2>
-        <p>Every <code>.mcap</code> under it is listed, including sub-folders. Choose a run to watch it, set an in and out point, and render an MP4 in whichever template you like.</p>
+        <p>Every <code>.mcap</code> under it is listed, including sub-folders. Choose a run to watch it, mark the part worth showing, and render an MP4 in whichever template you like.</p>
       </div>
     </div>
 
     <div class="transport" id="transport" hidden>
-      <div class="scrub">
-        <div class="marks" id="marks"><div class="drv" id="markDrive"></div><div class="sel" id="markSel"></div></div>
-        <input id="seek" type="range" min="0" max="1000" value="0">
+      <div class="scrubwrap">
+        <div class="flags" id="flags"></div>
+        <div class="scrub">
+          <div class="marks"><div class="drv" id="markDrive"></div><div class="sel" id="markSel"></div></div>
+          <input id="seek" type="range" min="0" max="1000" value="0" step="1">
+        </div>
+        <div class="times"><span id="tNow">0:00.0</span><span id="tTitle"></span><span id="tEnd">0:00.0</span></div>
       </div>
-      <div class="times"><span id="tNow">0:00.0</span><span id="tTitle"></span><span id="tEnd">0:00.0</span></div>
-      <div class="row spread">
-        <div class="row">
-          <button id="play">Play</button>
-          <button class="ghost" id="stepBack">&minus;1 frame</button>
-          <button class="ghost" id="stepFwd">+1 frame</button>
-          <label class="field">Speed
-            <select id="rate">
-              <option value="0.25">0.25&times;</option><option value="0.5">0.5&times;</option>
-              <option value="1" selected>1&times;</option><option value="2">2&times;</option><option value="4">4&times;</option>
-            </select>
-          </label>
-        </div>
-        <div class="row">
-          <button class="ghost" id="setIn">Set in</button>
-          <button class="ghost" id="setOut">Set out</button>
-          <button class="quiet" id="clearSel">Whole run</button>
-          <span class="hint" id="clipNote"></span>
-        </div>
-      </div>
-      <div class="row spread">
-        <div class="row">
-          <label class="field">Render speed
-            <select id="renderSpeed">
-              <option value="0.5">0.5&times;</option><option value="1" selected>1&times;</option>
-              <option value="2">2&times;</option><option value="4">4&times;</option>
-            </select>
-          </label>
-          <label class="field">Size
-            <select id="renderScale"><option value="1" selected>Full</option><option value="0.6667">720p-ish</option></select>
-          </label>
-          <label class="field">Quality
-            <select id="renderQuality">
-              <option value="web" selected>Web (small)</option>
-              <option value="medium">Medium</option>
-              <option value="high">High (master)</option>
-            </select>
-          </label>
-        </div>
-        <div class="row">
-          <button id="render">Render MP4</button>
-          <button class="ghost" id="queue">Add to batch</button>
-          <button class="ghost" id="openBatch">Batch (0)</button>
-        </div>
+
+      <div class="panes">
+        <section class="pane">
+          <h4>Playback</h4>
+          <div class="row">
+            <button id="play">Play</button>
+            <button class="ghost" id="stepBack">&minus;1 frame</button>
+            <button class="ghost" id="stepFwd">+1 frame</button>
+            <label class="field">Speed
+              <select id="rate">
+                <option value="0.25">0.25&times;</option><option value="0.5">0.5&times;</option>
+                <option value="1" selected>1&times;</option><option value="2">2&times;</option><option value="4">4&times;</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="pane right">
+          <h4>Render <span class="clipline" id="clipNote">the whole run</span></h4>
+          <div class="row">
+            <button class="ghost" id="setIn">Start render here</button>
+            <button class="ghost" id="setOut">End render here</button>
+            <button class="quiet" id="clearSel">Use whole run</button>
+          </div>
+          <div class="row">
+            <label class="field">Speed
+              <select id="renderSpeed">
+                <option value="0.5">0.5&times;</option><option value="1" selected>1&times;</option>
+                <option value="2">2&times;</option><option value="4">4&times;</option>
+              </select>
+            </label>
+            <label class="field">Size
+              <select id="renderScale"><option value="1" selected>Full</option><option value="0.6667">720p-ish</option></select>
+            </label>
+            <label class="field">Quality
+              <select id="renderQuality">
+                <option value="web" selected>Web (small)</option>
+                <option value="medium">Medium</option>
+                <option value="high">High (master)</option>
+              </select>
+            </label>
+            <button id="render">Render MP4</button>
+            <button class="ghost" id="queue">Add to batch</button>
+            <button class="ghost" id="openBatch" hidden>Batch (0)</button>
+          </div>
+        </section>
       </div>
     </div>
     <div class="jobs" id="jobs"></div>
   </main>
 </div>
+
+<dialog id="settings">
+  <form method="dialog" class="sheet">
+    <h3>Settings</h3>
+    <p class="hint">The app reads its templates from the GitLab assets repo, so a change pushed there shows up here without redeploying. It needs a read-only access token to do that, and tokens expire — usually after a year.</p>
+
+    <label class="field">GitLab access token
+      <input id="tokenInput" type="password" placeholder="glpat-…" autocomplete="off">
+    </label>
+    <div class="row" style="margin:10px 0">
+      <button type="button" id="testToken">Test it</button>
+      <button type="button" class="ghost" id="saveToken">Save on this machine</button>
+      <button type="button" class="quiet" id="clearToken">Clear</button>
+    </div>
+    <div id="tokenStatus" class="status"></div>
+
+    <details>
+      <summary>Making a token that works</summary>
+      <p>In GitLab, open <b>log-studio-assets</b> → Settings → Access tokens, and create a <b>project</b> access token — not a personal one. A personal token would hand out everything your account can see, and this one is published in the app where anyone can read it.</p>
+      <ul>
+        <li>Role: <b>Reporter</b></li>
+        <li>Scopes: <b>read_api</b>, <b>read_repository</b>, <b>read_registry</b></li>
+        <li>Expiry: as long as GitLab allows</li>
+      </ul>
+      <p>Saving it here fixes it on this machine only. To fix it for everyone, put it in <code>config.json</code> in the <code>log-studio</code> repo, under <code>gitlab.token</code>, and push — the site rebuilds itself.</p>
+    </details>
+
+    <div class="row spread" style="margin-top:14px">
+      <span class="hint" id="tokenSource"></span>
+      <button value="close">Close</button>
+    </div>
+  </form>
+</dialog>
+
 <script type="module" src="src/main.js"></script>
 <script>
   // Installing the app is what makes it work with no internet, which is the point in a

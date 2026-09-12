@@ -39,6 +39,9 @@ const fmtDur = (s) => {
   const m = Math.floor(s / 60), r = Math.round(s - m * 60);
   return m ? `${m}m ${String(r).padStart(2, "0")}s` : `${r}s`;
 };
+/** A run is either a handle from the folder picker or a File picked on its own. */
+const fileOf = (entry) => (entry.file ? Promise.resolve(entry.file) : entry.handle.getFile());
+
 const fmtSize = (b) => (b > 1 << 30 ? `${(b / 2 ** 30).toFixed(1)} GB` : `${Math.round(b / 2 ** 20)} MB`);
 const fmtTime = (s) => {
   if (!Number.isFinite(s)) return "0:00.0";
@@ -137,7 +140,7 @@ async function openRun(entry) {
   state.current = entry;
   drawList();
   $("empty").hidden = true;
-  const file = await entry.handle.getFile();
+  const file = await fileOf(entry);
   try {
     state.run = await loadRun(file, {
       onProgress: (p, what) => {
@@ -258,12 +261,19 @@ function outName(entry, tpl, clip, runStart) {
 async function renderNow() {
   if (!state.run || !state.current) return;
   const job = {
-    id: newId(), name: state.current.path, handle: state.current.handle,
+    id: newId(), name: state.current.path,
+    handle: state.current.handle ?? null, file: state.current.file ?? null,
     clip: clipNow(), ...settings(),
     outName: outName(state.current, state.templateId, state.clip, state.run.span.start),
   };
-  await putJob({ id: job.id, jobs: [job] });
-  window.open(`render.html#${job.id}`, "_blank", "noopener");
+  try {
+    await putJob({ id: job.id, jobs: [job] });
+  } catch (err) {
+    $("folderNote").textContent = `Could not start the render: ${err.message}`;
+    return;
+  }
+  const tab = window.open(`render.html#${job.id}`, "_blank");
+  if (!tab) $("folderNote").textContent = "The render tab was blocked — allow pop-ups for this site and try again.";
 }
 
 function addToBatch(entry, clip) {
@@ -300,14 +310,21 @@ function refreshBatch() {
 async function renderBatch() {
   if (!state.batch.length) return;
   const jobs = state.batch.map((b) => ({
-    id: newId(), name: b.entry.path, handle: b.entry.handle,
+    id: newId(), name: b.entry.path,
+    handle: b.entry.handle ?? null, file: b.entry.file ?? null,
     clip: b.clip, template: b.template, speed: b.speed, scale: b.scale,
     quality: b.quality, fps: b.fps,
     outName: outName(b.entry, b.template, b.clip, b.clip?.runStart ?? 0),
   }));
   const id = newId();
-  await putJob({ id, jobs });
-  window.open(`render.html#${id}`, "_blank", "noopener");
+  try {
+    await putJob({ id, jobs });
+  } catch (err) {
+    $("folderNote").textContent = `Could not start the batch: ${err.message}`;
+    return;
+  }
+  const tab = window.open(`render.html#${id}`, "_blank");
+  if (!tab) $("folderNote").textContent = "The render tab was blocked — allow pop-ups for this site and try again.";
 }
 
 function saveJobFile() {
@@ -389,7 +406,9 @@ $("pickFile").onclick = () => $("fileInput").click();
 $("fileInput").onchange = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const entry = { ...describe(file.name, file.size), handle: { getFile: async () => file } };
+  // Keep the File itself rather than wrapping it in an object with a method: a render
+  // job is handed to another tab through IndexedDB, and a function cannot be stored.
+  const entry = { ...describe(file.name, file.size), file };
   state.files = [entry]; drawList(); openRun(entry);
 };
 $("folder").onchange = drawList;
@@ -449,4 +468,7 @@ document.addEventListener("keydown", (e) => {
   };
   await showBanner();
   await document.fonts.ready;
+  // The page checks this. If the module fails to load, nothing is wired and every
+  // button silently does nothing, so the page needs to be able to tell.
+  window.__logStudioReady = true;
 })();

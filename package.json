@@ -7,6 +7,7 @@
   "scripts": {
     "build": "node build.mjs",
     "serve": "node build.mjs && npx --yes http-server dist -p 8080 -c-1",
+    "deploy": "node build.mjs && wrangler deploy",
     "test": "node test/e2e.mjs"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
-    "playwright": "^1.49.0"
+    "playwright": "^1.49.0",
+    "wrangler": "^4.0.0"
   }
 }

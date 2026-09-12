@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "compatibility_date": "2026-09-01",
+  "name": "log-studio",
+
+  // Static assets only. The website needs a "main" entrypoint because Astro renders on
+  // the server; this app is a folder of files, so Cloudflare serves them directly and
+  // there is no Worker script to write or maintain.
+  "assets": {
+    "directory": "./dist"
+  },
+
+  "observability": { "enabled": true },
+  "workers_dev": false,
+  "preview_urls": true,
+  "routes": [{ "pattern": "log-studio.teambathracingelectric.com", "custom_domain": true }]
+}

@@ -1,0 +1,45 @@
+name: Deploy
+
+# The same shape as tbre-website's CI: build, then hand dist/ to Cloudflare with
+# wrangler. It needs two secrets, CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID —
+# the same pair the website uses. If the organisation holds them as org-level secrets
+# and this repo is in scope, there is nothing to add.
+#
+# Until they exist, the deploy step skips with a note rather than failing red.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+
+      - name: Deploy to Cloudflare
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx wrangler deploy
+
+      - name: Explain why nothing was deployed
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: |
+          echo "::notice::Built fine, but CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are not set on this repository, so nothing was deployed. Add them under Settings - Secrets and variables - Actions, or give this repo access to the organisation secrets the website already uses."
